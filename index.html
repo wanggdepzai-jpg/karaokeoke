@@ -1,258 +1,1038 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hệ Thống Karaoke P2P Đa Thiết Bị</title>
-    <!-- Tailwind CSS để giao diện đẹp mắt -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- PeerJS CDN để kết nối P2P trực tiếp qua trình duyệt -->
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#141110">
+<title>LABA — Phòng hát karaoke qua trình duyệt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Be+Vietnam+Pro:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#141110; --panel:#1b1713; --panel2:#221d17;
+  --line:#2c2721; --line2:#3d362c;
+  --ink:#f1e9d8; --mut:#b3a691; --dim:#8a7e6c;
+  --acc:#ff4b2e; --ok:#8fc978;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.55 'Be Vietnam Pro',sans-serif;min-height:100vh}
+::selection{background:var(--acc);color:#1a0b06}
+[hidden]{display:none!important}
+.mono{font-family:'IBM Plex Mono',monospace}
+.ic{width:20px;height:20px;flex-shrink:0}
+.ic.sm{width:14px;height:14px}
+button{font:inherit;color:inherit}
+a{color:var(--acc)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+::-webkit-scrollbar{height:8px;width:8px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+
+.scr{display:none}
+.scr.on{display:block}
+
+/* ===== nút chung ===== */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--line2);
+  background:transparent;border-radius:10px;font-weight:600;font-size:14px;cursor:pointer;transition:.15s}
+.btn:hover{background:#241f19;border-color:#4d4437}
+.btn.acc{background:var(--acc);border-color:var(--acc);color:#1a0b06}
+.btn.acc:hover{background:#ff5f45;border-color:#ff5f45}
+.btn:disabled{opacity:.55;cursor:wait}
+.btn.ghostw{width:100%;justify-content:center}
+.ctl{width:46px;height:46px;border-radius:50%;border:1px solid var(--line2);background:transparent;
+  display:grid;place-items:center;cursor:pointer;transition:.15s}
+.ctl:hover{background:var(--ink);color:#141110;border-color:var(--ink)}
+.ctl.big{width:54px;height:54px;background:var(--ink);color:#141110;border-color:var(--ink)}
+.ctl.big:hover{background:#fff}
+input[type=text],input:not([type]){background:#151210;border:1px solid var(--line2);color:var(--ink);
+  padding:12px 14px;border-radius:10px;font:inherit;width:100%}
+input:focus{border-color:var(--acc);outline:none}
+input[type=range]{-webkit-appearance:none;appearance:none;height:4px;background:var(--line2);border-radius:2px;flex:1;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--ink)}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border:0;border-radius:50%;background:var(--ink)}
+
+/* ===== toast ===== */
+#toasts{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:99;align-items:center;width:max-content;max-width:92vw}
+.toast{background:#241f19;border:1px solid var(--line2);padding:10px 16px;border-radius:10px;font-size:13.5px;
+  opacity:0;transform:translateY(8px);transition:.25s;text-align:center}
+.toast.in{opacity:1;transform:none}
+.toast.err{border-color:var(--acc);color:#ffb4a6}
+
+/* ===== màn chào ===== */
+.top{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.logo{font:800 22px 'Bricolage Grotesque';letter-spacing:.02em;display:flex;align-items:center;gap:6px}
+.logo .dot{width:8px;height:8px;border-radius:50%;background:var(--acc)}
+.top-note{font:500 11.5px 'IBM Plex Mono';letter-spacing:.12em;color:var(--dim)}
+.poster{max-width:1060px;margin:0 auto;padding:44px 22px 60px}
+.kicker-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.kicker{font:700 12px 'IBM Plex Mono';letter-spacing:.28em;color:var(--acc)}
+.poster h1{font:800 clamp(58px,11vw,138px)/0.95 'Bricolage Grotesque';letter-spacing:-.02em;margin-bottom:22px}
+.poster h1 em{font-style:normal;color:var(--acc)}
+.lede{max-width:560px;color:var(--mut);font-size:clamp(15px,1.6vw,17.5px);margin-bottom:40px}
+.roles{display:flex;flex-direction:column}
+.role{display:flex;align-items:center;gap:20px;width:100%;text-align:left;padding:22px 12px;background:none;border:0;
+  border-top:1px solid var(--line);cursor:pointer;transition:.15s}
+.roles .role:last-child{border-bottom:1px solid var(--line)}
+.r-ix{font:700 13px 'IBM Plex Mono';color:var(--dim)}
+.r-ic{color:var(--mut);display:grid}
+.r-main{flex:1;min-width:0}
+.r-main b{display:block;font:700 clamp(20px,3vw,30px)/1.12 'Bricolage Grotesque'}
+.r-main small{color:var(--mut);font-size:13.5px}
+.r-arrow{color:var(--dim);transition:transform .18s}
+.role:hover{background:var(--acc);color:#1a0b06;border-color:var(--acc)}
+.role:hover .r-ix,.role:hover .r-ic,.role:hover .r-main small,.role:hover .r-arrow{color:#4d2415}
+.role:hover .r-arrow{transform:translateX(6px)}
+.steps{list-style:none;display:flex;flex-wrap:wrap;gap:10px 26px;margin-top:30px;padding-top:20px;border-top:1px solid var(--line)}
+.steps li{display:flex;gap:10px;align-items:baseline;color:var(--mut);font-size:13.5px}
+.steps i{font:700 11px 'IBM Plex Mono';color:var(--acc);font-style:normal}
+.foot{max-width:1060px;margin:0 auto;padding:0 22px 34px;font:500 11.5px 'IBM Plex Mono';letter-spacing:.1em;color:var(--dim)}
+
+/* ===== máy chính ===== */
+.bar{display:flex;align-items:center;gap:18px;padding:13px 22px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.logo.sm{font-size:18px}
+.bar-room{font-size:13px;color:var(--mut)}
+.bar-room b{font:700 18px 'IBM Plex Mono';color:var(--acc);letter-spacing:.1em;margin-left:6px}
+.bar-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.host-grid{max-width:1280px;margin:18px auto 0;padding:0 18px;display:grid;
+  grid-template-columns:minmax(0,1.6fr) minmax(280px,.9fr);gap:16px;align-items:start}
+.video-frame{position:relative;aspect-ratio:16/9;background:#000;border:1px solid var(--line2);border-radius:14px;overflow:hidden}
+.video-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.video-empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:#5a5145;padding:20px}
+.video-empty b{display:block;font:800 26px 'Bricolage Grotesque';color:#6e6250;margin-bottom:6px;letter-spacing:.03em}
+.video-empty span{font-size:13.5px}
+.now{display:flex;align-items:baseline;gap:12px;padding:12px 2px;border-bottom:1px solid var(--line)}
+.now-tag{font:700 10.5px 'IBM Plex Mono';letter-spacing:.18em;color:var(--acc)}
+.now-title{flex:1;min-width:0;font:700 17px 'Bricolage Grotesque';white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.now-time{color:var(--mut);font:500 13px 'IBM Plex Mono';flex-shrink:0}
+.songctl{display:flex;gap:10px;align-items:center;padding-top:12px;flex-wrap:wrap}
+.addsong{display:flex;gap:8px;flex:1;min-width:240px}
+.side{display:flex;flex-direction:column;gap:14px}
+.roomcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.rc-label{font:700 11px 'IBM Plex Mono';letter-spacing:.2em;color:var(--dim)}
+.rc-code{font:700 clamp(52px,6vw,80px)/1 'IBM Plex Mono';letter-spacing:.1em;margin:8px 0 12px}
+.rc-status{color:var(--mut);font-size:13px;border-top:1px solid var(--line);padding-top:10px}
+.queuecard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.qc-head{font:700 11px 'IBM Plex Mono';letter-spacing:.2em;color:var(--dim);margin-bottom:8px;display:flex;justify-content:space-between;gap:8px}
+#hQueue{list-style:none}
+#hQueue li{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px}
+#hQueue li:first-child{border-top:0}
+.q-ix{font:700 11px 'IBM Plex Mono';color:var(--dim)}
+.q-t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.q-by{color:var(--dim);font-size:12px;flex-shrink:0}
+.q-x{background:none;border:0;color:var(--dim);cursor:pointer;padding:2px;display:grid}
+.q-x:hover{color:var(--acc)}
+.q-empty{color:var(--dim);text-align:center;padding:12px 0!important;font-size:13px}
+
+/* ===== bàn trộn ===== */
+.mixer{max-width:1280px;margin:16px auto 46px;padding:0 18px}
+.mx-head{display:flex;align-items:center;gap:14px;margin-bottom:10px;flex-wrap:wrap}
+.mx-title{font:800 20px 'Bricolage Grotesque';letter-spacing:.04em}
+.mx-hint{color:var(--dim);font-size:12.5px;margin-right:auto}
+.btn.rec .ic{color:var(--acc)}
+.btn.rec.live{background:var(--acc);border-color:var(--acc);color:#1a0b06;animation:pulse 1.2s infinite}
+.btn.rec.live .ic{color:#1a0b06}
+@keyframes pulse{50%{opacity:.72}}
+.mx-chans{display:flex;gap:14px;padding:18px 16px;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow-x:auto}
+.ch{display:flex;flex-direction:column;align-items:center;gap:10px;min-width:78px}
+.ch .vu{width:14px;height:168px}
+.fade{position:relative;width:46px;height:180px;touch-action:none;cursor:ns-resize;flex-shrink:0}
+.fade .ticks{position:absolute;inset:0;
+  background-image:repeating-linear-gradient(to bottom,var(--line) 0,var(--line) 1px,transparent 1px,transparent 18px),
+                   repeating-linear-gradient(to bottom,var(--line) 0,var(--line) 1px,transparent 1px,transparent 18px);
+  background-size:10px 100%,10px 100%;background-position:left top,right top;background-repeat:no-repeat,no-repeat}
+.fade .slot{position:absolute;left:50%;top:2px;bottom:2px;width:6px;transform:translateX(-50%);background:#0d0b09;border-radius:3px}
+.fade .thumb{position:absolute;left:50%;transform:translateX(-50%);width:44px;height:22px;background:#ece1c8;border-radius:6px;box-shadow:0 3px 8px rgba(0,0,0,.55)}
+.fade .thumb::after{content:'';position:absolute;left:6px;right:6px;top:9px;height:3px;background:#141110;border-radius:2px}
+.ch-name{font-weight:600;font-size:12.5px;max-width:90px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch-sub{display:flex;align-items:center;gap:8px}
+.pct{font:500 12px 'IBM Plex Mono';color:var(--mut)}
+.mute{width:26px;height:26px;border-radius:50%;border:1px solid var(--line2);background:none;color:var(--mut);
+  font:700 12px 'IBM Plex Mono';cursor:pointer;transition:.15s}
+.mute:hover{border-color:var(--acc);color:var(--acc)}
+.mute.on{background:var(--acc);border-color:var(--acc);color:#1a0b06}
+.ch.ghost{justify-content:center;min-width:180px;border:1px dashed var(--line2);border-radius:12px;color:var(--dim);
+  text-align:center;padding:0 14px;font-size:13.5px}
+.ch.ghost small{display:block;font-size:12px;opacity:.75;margin-top:4px}
+
+/* ===== modal & quét QR ===== */
+.modal{position:fixed;inset:0;display:none;place-items:center;background:rgba(10,8,6,.74);z-index:50;padding:18px}
+.modal.on{display:grid}
+.modal-card{background:var(--panel);border:1px solid var(--line2);border-radius:16px;padding:24px 22px;max-width:430px;width:100%;position:relative;text-align:center}
+.modal-card p{color:var(--mut);font-size:13px;margin:14px 0 8px}
+.modal-x{position:absolute;top:10px;right:10px;background:none;border:0;color:var(--dim);cursor:pointer;padding:6px;display:grid}
+.modal-x:hover{color:var(--ink)}
+.qr-paper{background:#f3ecdd;padding:14px;display:inline-block;border-radius:8px}
+.qr-paper svg{display:block;width:min(250px,66vw);height:auto}
+.qr-code{font:700 26px 'IBM Plex Mono';letter-spacing:.3em;color:var(--acc);margin-top:10px}
+.qr-link{font:500 12px 'IBM Plex Mono';color:var(--dim);word-break:break-all}
+.scan-box{position:relative;max-width:420px;width:100%;background:#000;aspect-ratio:1;overflow:hidden;border:1px solid var(--line2);border-radius:14px}
+.scan-box video{width:100%;height:100%;object-fit:cover;display:block}
+.scan-frame{position:absolute;inset:24%;border:2px solid var(--acc);border-radius:14px;pointer-events:none}
+.scan-hint{position:absolute;left:0;right:0;bottom:12px;text-align:center;color:#d8cdb8;font-size:12.5px}
+.scan-box .modal-x{color:#d8cdb8;z-index:2}
+
+/* ===== điện thoại ===== */
+.phone-wrap{max-width:480px;margin:0 auto;padding:18px 16px 46px}
+#pJoin{max-width:420px;margin:26px auto 0}
+#pJoin .kicker{margin-bottom:4px;display:block}
+#pJoin h2{font:800 36px 'Bricolage Grotesque';margin:14px 0 6px}
+.join-sub{color:var(--mut);margin-bottom:26px}
+#pJoin label{display:block;margin-bottom:16px;font:700 11px 'IBM Plex Mono';letter-spacing:.18em;color:var(--dim)}
+#pJoin label input{margin-top:8px}
+#pRoom{font:700 28px 'IBM Plex Mono';letter-spacing:.35em;text-transform:uppercase;text-align:center}
+.p-top{display:flex;align-items:center;gap:12px;padding:6px 0 14px;border-bottom:1px solid var(--line);color:var(--mut);font-size:13px;flex-wrap:wrap}
+.p-top b{font:700 15px 'IBM Plex Mono';color:var(--acc);letter-spacing:.08em}
+#pMe{margin-left:auto;color:var(--dim)}
+.mic-stage{display:flex;flex-direction:column;align-items:center;gap:13px;padding:28px 0 24px}
+.mic-btn{position:relative;width:min(60vw,206px);aspect-ratio:1;border-radius:50%;background:#1e1a15;border:1px solid var(--line2);
+  color:var(--mut);cursor:pointer;display:grid;place-items:center;transition:.2s}
+.mic-btn .ic{width:32%;height:32%}
+.mic-btn .ring{position:absolute;inset:-8px;width:calc(100% + 16px);height:calc(100% + 16px);transform:rotate(-90deg);pointer-events:none}
+.ring-bg{fill:none;stroke:var(--line);stroke-width:3}
+.ring-fg{fill:none;stroke:var(--acc);stroke-width:3;stroke-linecap:round;stroke-dasharray:578;stroke-dashoffset:578;transition:stroke-dashoffset .06s linear}
+.mic-btn.on{color:var(--acc);border-color:var(--acc)}
+.mic-state{font:800 20px 'Bricolage Grotesque';letter-spacing:.06em;color:var(--mut)}
+.mic-state.on{color:var(--acc)}
+.mic-state.connecting{color:var(--mut);animation:pulse 1.2s infinite}
+.mic-sub{color:var(--dim);font-size:12.5px;text-align:center;max-width:310px}
+.p-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.pc-head{font:700 10.5px 'IBM Plex Mono';letter-spacing:.18em;color:var(--dim);margin-bottom:10px;display:flex;justify-content:space-between;gap:8px}
+.pc-title{font:700 16px 'Bricolage Grotesque';margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-prog{height:22px;display:flex;align-items:center;cursor:pointer;touch-action:none}
+.p-track{height:5px;background:var(--line2);border-radius:3px;flex:1;position:relative;overflow:hidden}
+#pFill{position:absolute;left:0;top:0;bottom:0;background:var(--acc);width:0}
+.p-times{display:flex;justify-content:space-between;color:var(--dim);font-size:11.5px;margin:2px 0 10px}
+.p-ctl{display:flex;align-items:center;gap:10px}
+.p-vol{display:flex;align-items:center;gap:8px;flex:1;color:var(--mut);min-width:0}
+.addsongs{display:flex;gap:8px;margin-top:2px}
+.p-sent{color:var(--ok);font-size:12.5px;height:17px;margin-top:8px}
+.p-note{color:var(--dim);font-size:12.5px;text-align:center;margin:4px 0 14px;line-height:1.6}
+.lost{position:fixed;inset:0;background:rgba(12,9,7,.92);display:grid;place-items:center;z-index:60;text-align:center;padding:20px}
+.lost h3{font:800 28px 'Bricolage Grotesque';margin-bottom:14px}
+
+@media (max-width:920px){
+  .host-grid{grid-template-columns:1fr}
+  .mx-hint{width:100%;order:3}
+}
+</style>
 </head>
-<body class="bg-slate-950 text-white min-h-screen p-4 flex flex-col items-center">
+<body>
 
-    <div class="max-w-4xl w-full bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl">
-        <h1 class="text-2xl font-black text-center mb-2 text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-violet-500">
-            🎤 Phòng Karaoke Đa Thiết Bị (P2P)
-        </h1>
-        <p class="text-center text-slate-400 text-sm mb-6">Thu âm từ điện thoại không dây trực tiếp về Laptop qua WebRTC</p>
-        
-        <!-- Cấu hình kết nối ban đầu -->
-        <div id="setup-section" class="flex flex-col sm:flex-row gap-3 mb-6 justify-center items-center bg-slate-800/50 p-4 rounded-xl">
-            <input type="text" id="room-input" placeholder="Nhập tên phòng (vd: phongkaraoke123)" class="px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 focus:outline-none focus:border-pink-500 w-72 text-sm">
-            <select id="role-select" class="px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 focus:outline-none text-sm">
-                <option value="laptop">💻 Laptop (Nhận tiếng + Mở YouTube)</option>
-                <option value="phone">📱 Điện thoại (Thu âm gửi đi)</option>
-            </select>
-            <button onclick="initSystem()" class="bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90 px-6 py-2.5 rounded-lg font-semibold transition text-sm shadow-lg">Vào Phòng</button>
+<!-- bộ icon vẽ tay -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.3v13.4c0 .8.9 1.3 1.6.9l10.4-6.7c.6-.4.6-1.4 0-1.8L9.6 4.4c-.7-.4-1.6.1-1.6.9Z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path fill="currentColor" d="M7 5h3.2v14H7zM13.8 5H17v14h-3.2z"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path fill="currentColor" d="M5.5 5.8v12.4c0 .9 1 1.4 1.7.9l8.8-6.2c.6-.4.6-1.4 0-1.8L7.2 4.9c-.7-.5-1.7 0-1.7.9Z"/><rect fill="currentColor" x="17" y="5" width="2.6" height="14" rx="1"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><path fill="currentColor" d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4Z"/><path fill="currentColor" d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.9V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.1a7 7 0 0 0 6-6.9Z"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M4 12h15M13.5 5.5 20 12l-6.5 6.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z"/><path fill="currentColor" d="M14 14h2.5v2.5H14zM17.5 17.5H20V20h-2.5zM14 18.6V20h1.4zM18.6 14H20v1.4z"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M5 15h-.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"/></symbol>
+  <symbol id="i-vol" viewBox="0 0 24 24"><path fill="currentColor" d="M4 9v6h4l5 4V5L8 9H4Z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-rec" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="currentColor"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="4.5" y="5" width="15" height="10.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M2.5 18.5h19"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7.5" y="3" width="9" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="17.6" r="1.1" fill="currentColor"/></symbol>
+</svg>
+
+<!-- ============ MÀN CHỌN VAI TRÒ ============ -->
+<section id="scr-intro" class="scr on">
+  <header class="top">
+    <div class="logo">LABA<span class="dot"></span></div>
+    <div class="top-note">KARAOKE QUA TRÌNH DUYỆT · WEBRTC P2P · KHÔNG CẦN CÀI ĐẶT</div>
+  </header>
+  <div class="poster">
+    <div class="kicker-row">
+      <span class="kicker">MỘT MÁY CHÍNH — BAO NHIÊU MICRO CŨNG ĐƯỢC</span>
+      <span class="top-note">ÂM THANH ĐI THẲNG GIỮA CÁC MÁY</span>
+    </div>
+    <h1>CẢ NHÀ<br>CÙNG <em>HÁT</em>.</h1>
+    <p class="lede">Máy tính mở nhạc karaoke YouTube lên loa. Điện thoại của mọi người hoá thành micro không dây —
+      giọng hát về chung một bàn trộn, ai cũng có thể điểm bài và điều khiển sân khấu.</p>
+    <div class="roles">
+      <button class="role" id="btnHost">
+        <span class="r-ix">01</span>
+        <span class="r-ic"><svg class="ic"><use href="#i-laptop"/></svg></span>
+        <span class="r-main"><b>Tạo phòng hát</b><small>dành cho máy tính — mở YouTube, nhận &amp; trộn tiếng từ mọi micro, có bản mixer riêng</small></span>
+        <svg class="ic r-arrow"><use href="#i-arrow"/></svg>
+      </button>
+      <button class="role" id="btnMic">
+        <span class="r-ix">02</span>
+        <span class="r-ic"><svg class="ic"><use href="#i-phone"/></svg></span>
+        <span class="r-main"><b>Thành micro</b><small>dành cho điện thoại — hát, nghe điều khiển, điểm bài mới cho cả phòng</small></span>
+        <svg class="ic r-arrow"><use href="#i-arrow"/></svg>
+      </button>
+    </div>
+    <ol class="steps">
+      <li><i>01</i>Tạo phòng trên máy tính</li>
+      <li><i>02</i>Điện thoại quét mã QR (hoặc nhập mã 4 ký tự)</li>
+      <li><i>03</i>Dán link karaoke YouTube, bật micro và hát</li>
+    </ol>
+  </div>
+  <div class="foot">MÃ PHÒNG LÀ "CHÌA KHÓA" — CHỈ AI CÓ MÃ MỚI VÀO ĐƯỢC · HÃY MỞ TRANG BẰNG HTTPS (GITHUB PAGES ĐÃ SẴN SÀNG)</div>
+</section>
+
+<!-- ============ MÁY CHÍNH (LAPTOP) ============ -->
+<section id="scr-host" class="scr">
+  <header class="bar">
+    <div class="logo sm">LABA<span class="dot"></span></div>
+    <div class="bar-room">PHÒNG<b id="hRoom">----</b></div>
+    <div class="bar-actions">
+      <button id="hCopy" class="btn"><svg class="ic sm"><use href="#i-copy"/></svg>Sao chép liên kết mời</button>
+      <button id="hQr" class="btn"><svg class="ic sm"><use href="#i-qr"/></svg>Mã QR</button>
+    </div>
+  </header>
+
+  <div class="host-grid">
+    <div class="stage">
+      <div class="video-frame">
+        <div id="yt"></div>
+        <div class="video-empty" id="hVidEmpty">
+          <div><b>SÂN KHẤU TRỐNG</b><span>Dán link video karaoke YouTube vào ô bên dưới rồi bấm «Điểm bài»</span></div>
         </div>
-
-        <!-- Trạng thái kết nối -->
-        <div id="status-box" class="hidden text-center mb-6 text-sm py-2 px-4 rounded-lg bg-slate-800 text-slate-300">
-            Trạng thái: <span id="status-text" class="font-semibold text-yellow-400">Đang kết nối...</span>
+      </div>
+      <div class="now">
+        <span class="now-tag">SÂN KHẤU</span>
+        <span class="now-title" id="hNowTitle">Chưa có bài — dán link karaoke YouTube bên dưới.</span>
+        <span class="now-time" id="hNowTime"></span>
+      </div>
+      <div class="songctl">
+        <button id="hPlay" class="ctl big" title="Phát / tạm dừng"><svg class="ic"><use href="#i-play"/></svg></button>
+        <button id="hNext" class="ctl" title="Bài tiếp theo"><svg class="ic"><use href="#i-next"/></svg></button>
+        <div class="addsong">
+          <input id="hUrl" type="text" placeholder="Dán link karaoke YouTube (watch, youtu.be, shorts…)" spellcheck="false">
+          <button id="hAdd" class="btn acc"><svg class="ic sm"><use href="#i-plus"/></svg>Điểm bài</button>
         </div>
-
-        <!-- Giao diện Laptop -->
-        <div id="laptop-panel" class="hidden space-y-6">
-            <!-- Khung YouTube -->
-            <div class="bg-slate-800/60 border border-slate-700/50 p-4 rounded-xl">
-                <h2 class="text-base font-semibold mb-3 flex items-center gap-2 text-pink-400">📺 Chọn Bài Hát Karaoke YouTube</h2>
-                <div class="flex gap-2 mb-3">
-                    <input type="text" id="yt-link" placeholder="Dán link YouTube (vd: https://www.youtube.com/watch?v=...)" class="flex-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-pink-500">
-                    <button onclick="loadYouTube()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-semibold transition">Phát Nhạc</button>
-                </div>
-                <div id="youtube-player-container" class="aspect-video w-full bg-black rounded-lg overflow-hidden flex items-center justify-center text-slate-500 border border-slate-800">
-                    Chưa có bài hát nào được chọn
-                </div>
-            </div>
-
-            <!-- Khung thu âm các điện thoại gửi về -->
-            <div class="bg-slate-800/60 border border-slate-700/50 p-4 rounded-xl">
-                <h2 class="text-base font-semibold mb-3 flex items-center gap-2 text-green-400">🎚️ Âm thanh thu từ các Điện thoại</h2>
-                <div id="audio-streams-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <p class="text-slate-500 text-sm italic col-span-2" id="no-phone-text">Đang chờ điện thoại kết nối vào phòng...</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Giao diện Điện thoại -->
-        <div id="phone-panel" class="hidden text-center space-y-6 py-12">
-            <div class="p-6 bg-slate-800/60 border border-slate-700/50 rounded-2xl max-w-sm mx-auto shadow-inner">
-                <div id="mic-status" class="text-lg font-medium text-yellow-400 mb-6">Trạng thái: Sẵn sàng kết nối</div>
-                <button id="mic-toggle-btn" onclick="toggleMic()" class="bg-emerald-600 hover:bg-emerald-700 text-white w-full py-4 rounded-xl text-lg font-bold shadow-lg transition flex items-center justify-center gap-2">
-                    🎙️ Bật Micro Hát
-                </button>
-                <p class="text-xs text-slate-400 mt-4 leading-relaxed">Hãy đeo tai nghe trên điện thoại khi hát để tránh tiếng hú vọng vào loa của Laptop.</p>
-            </div>
-        </div>
+      </div>
     </div>
 
-    <script>
-        let peer;
-        let myRole = '';
-        let roomName = '';
-        let localStream = null;
-        let connectedCalls = {};
+    <aside class="side">
+      <div class="roomcard">
+        <div class="rc-label">MÃ PHÒNG</div>
+        <div class="rc-code mono" id="hCodeBig">----</div>
+        <div class="rc-status" id="hStatus">Đang chờ…</div>
+      </div>
+      <div class="queuecard">
+        <div class="qc-head"><span>HÀNG CHỜ</span><span id="hQCount" class="mono"></span></div>
+        <ul id="hQueue"></ul>
+      </div>
+    </aside>
+  </div>
 
-        function setStatus(text, colorClass = "text-yellow-400") {
-            const box = document.getElementById('status-box');
-            const txt = document.getElementById('status-text');
-            box.classList.remove('hidden');
-            txt.className = `font-semibold ${colorClass}`;
-            txt.innerText = text;
+  <section class="mixer">
+    <div class="mx-head">
+      <span class="mx-title">BÀN TRỘN</span>
+      <span class="mx-hint">kéo fader dọc để chỉnh · M = tắt tiếng kênh · nhấp đôi fader = về 0 dB · mỗi điện thoại là một kênh</span>
+      <button id="hRec" class="btn rec"><svg class="ic sm"><use href="#i-rec"/></svg><span id="hRecTxt">GHI tiếng micro</span></button>
+    </div>
+    <div class="mx-chans" id="hChans"></div>
+  </section>
+</section>
+
+<!-- ============ ĐIỆN THOẠI (MICRO) ============ -->
+<section id="scr-phone" class="scr">
+  <div class="phone-wrap">
+
+    <div id="pJoin">
+      <div class="logo">LABA<span class="dot"></span></div>
+      <h2>Vào phòng hát</h2>
+      <p class="join-sub">Điện thoại của bạn sẽ trở thành micro không dây cho máy chính.</p>
+      <label>BIỆT DANH CỦA BẠN
+        <input id="pName" type="text" maxlength="18" placeholder="Ví dụ: Bố, Lan, Nam…" autocomplete="off">
+      </label>
+      <label>MÃ PHÒNG (4 KÝ TỰ)
+        <input id="pRoom" class="mono" maxlength="4" placeholder="----" autocomplete="off"
+               autocapitalize="characters" inputmode="text" spellcheck="false">
+      </label>
+      <button id="pGo" class="btn acc ghostw">VÀO PHÒNG</button>
+      <p class="p-err" id="pErr"></p>
+      <button id="pScanBtn" class="btn ghostw"><svg class="ic sm"><use href="#i-qr"/></svg>Quét mã QR trên máy chính</button>
+    </div>
+
+    <div id="pStage" hidden>
+      <header class="p-top">
+        <div class="logo sm">LABA<span class="dot"></span></div>
+        <span>PHÒNG <b id="pRoomTag">----</b></span>
+        <span id="pMe"></span>
+      </header>
+
+      <div class="mic-stage">
+        <button id="pMic" class="mic-btn" title="Bật / tắt micro">
+          <svg class="ring" viewBox="0 0 200 200"><circle class="ring-bg" cx="100" cy="100" r="92"/><circle class="ring-fg" id="pRing" cx="100" cy="100" r="92"/></svg>
+          <svg class="ic"><use href="#i-mic"/></svg>
+        </button>
+        <div class="mic-state" id="pMicState">Chạm để mở micro</div>
+        <div class="mic-sub">Giọng bạn đi thẳng lên loa máy chính — hãy để mắt tới màn hình đó khi hát nhé.</div>
+      </div>
+
+      <div class="p-card">
+        <div class="pc-head"><span>NHẠC TỪ MÁY CHÍNH</span><span id="pQ" class="mono"></span></div>
+        <div class="pc-title" id="pTitle">—</div>
+        <div class="p-prog" id="pProg"><div class="p-track"><div id="pFill"></div></div></div>
+        <div class="p-times mono"><span id="pPos">0:00</span><span id="pDur">0:00</span></div>
+        <div class="p-ctl">
+          <button id="pPlay" class="ctl" title="Phát / tạm dừng"><svg class="ic"><use href="#i-play"/></svg></button>
+          <button id="pNext" class="ctl" title="Bài tiếp theo"><svg class="ic"><use href="#i-next"/></svg></button>
+          <div class="p-vol"><svg class="ic sm"><use href="#i-vol"/></svg><input type="range" id="pVol" min="0" max="100" value="80"></div>
+        </div>
+      </div>
+
+      <div class="p-card">
+        <div class="pc-head"><span>ĐIỂM BÀI MỚI</span></div>
+        <div class="addsongs">
+          <input id="pUrl" type="text" placeholder="Dán link YouTube karaoke…" spellcheck="false">
+          <button id="pReq" class="btn acc">Gửi</button>
+        </div>
+        <div class="p-sent" id="pSent"></div>
+      </div>
+
+      <div class="p-note">Giữ màn hình điện thoại sáng để micro không bị ngắt.<br>Loa máy chính bật càng to, buổi hát càng vui.</div>
+      <button id="pLeave" class="btn ghostw">Rời phòng</button>
+    </div>
+  </div>
+
+  <div id="pLost" class="lost" hidden>
+    <div>
+      <h3>MẤT KẾT NỐI</h3>
+      <button id="pRetry" class="btn acc">Kết nối lại phòng</button>
+    </div>
+  </div>
+</section>
+
+<!-- modal QR -->
+<div id="qrModal" class="modal">
+  <div class="modal-card">
+    <button class="modal-x" id="qrX" title="Đóng"><svg class="ic"><use href="#i-x"/></svg></button>
+    <div class="qr-paper" id="qrPaper"></div>
+    <div class="qr-code" id="qrCode">----</div>
+    <p>Điện thoại mở camera quét mã trên, hoặc truy cập link dưới đây rồi nhập mã phòng:</p>
+    <div class="qr-link" id="qrUrl"></div>
+  </div>
+</div>
+
+<!-- modal quét QR -->
+<div id="scanModal" class="modal">
+  <div class="scan-box">
+    <button class="modal-x" id="scanX" title="Đóng"><svg class="ic"><use href="#i-x"/></svg></button>
+    <video id="scanVid" playsinline muted></video>
+    <div class="scan-frame"></div>
+    <div class="scan-hint">Đưa camera vào mã QR trên màn hình máy chính</div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+/* ================= TIỆN ÍCH ================= */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=s=>{s=Math.max(0,Math.floor(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+const code4=()=>{const c='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let r='';for(let i=0;i<4;i++)r+=c[Math.random()*c.length|0];return r;};
+const inviteURL=r=>location.href.split(/[?#]/)[0]+'?room='+r;
+
+function show(id){$$('.scr').forEach(s=>s.classList.toggle('on',s.id===id));window.scrollTo(0,0);}
+function toast(msg,kind){
+  const t=document.createElement('div');t.className='toast'+(kind?' '+kind:'');t.textContent=msg;
+  $('#toasts').appendChild(t);requestAnimationFrame(()=>t.classList.add('in'));
+  setTimeout(()=>{t.classList.remove('in');setTimeout(()=>t.remove(),300);},3400);
+}
+function parseYT(u){
+  u=(u||'').trim();if(!u)return null;
+  const m=u.match(/(?:youtu\.be\/|[?&]v=|shorts\/|embed\/|live\/)([A-Za-z0-9_-]{11})/);
+  if(m)return m[1];
+  return /^[A-Za-z0-9_-]{11}$/.test(u)?u:null;
+}
+async function fetchTitle(id){
+  try{const r=await fetch('https://www.youtube.com/oembed?format=json&url='+encodeURIComponent('https://www.youtube.com/watch?v='+id));
+    if(r.ok){const j=await r.json();return j.title||null;}}catch(e){}
+  return null;
+}
+function copyText(s,msg){
+  const fb=()=>{const t=document.createElement('textarea');t.value=s;document.body.appendChild(t);t.select();
+    try{document.execCommand('copy');toast(msg||'Đã sao chép');}catch(e){toast('Không sao chép được','err');}t.remove();};
+  if(navigator.clipboard)navigator.clipboard.writeText(s).then(()=>toast(msg||'Đã sao chép')).catch(fb);else fb();
+}
+function setPlayIcon(btn,playing){btn.innerHTML='<svg class="ic"><use href="#i-'+(playing?'pause':'play')+'"/></svg>';}
+
+/* ================= MÁY CHÍNH ================= */
+const H={room:'',peer:null,conns:[],names:{},chans:new Map(),actx:null,recBus:null,recDest:null,
+  mr:null,recChunks:[],recT:0,recTimer:null,player:null,queue:[],cur:{id:null,by:'',title:''},
+  musicV:.8,ui:{},ghost:false};
+let ytAPI=false,ytPend=false;
+window.onYouTubeIframeAPIReady=()=>{ytAPI=true;if(ytPend)buildPlayer();};
+// nạp API YouTube sau khi callback đã được định nghĩa
+(function(){const s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';document.head.appendChild(s);})();
+
+function ensureAudio(){
+  if(!H.actx){
+    H.actx=new (window.AudioContext||window.webkitAudioContext)();
+    H.recBus=H.actx.createGain();
+    H.recDest=H.actx.createMediaStreamDestination();
+    H.recBus.connect(H.recDest);
+  }
+  if(H.actx.state==='suspended')H.actx.resume();
+}
+
+function createRoom(btn){
+  try{ensureAudio();}catch(e){}
+  btn.disabled=true;btn.textContent='Đang tạo phòng…';
+  let tries=0;
+  const attempt=()=>{
+    H.room=code4();
+    H.peer=new Peer('laba-'+H.room.toLowerCase(),{debug:0});
+    H.peer.on('open',()=>{btn.disabled=false;btn.textContent='Tạo phòng hát';enterHost();});
+    H.peer.on('error',e=>{
+      if(e.type==='unavailable-id'&&tries++<5){try{H.peer.destroy();}catch(x){}attempt();return;}
+      btn.disabled=false;btn.textContent='Tạo phòng hát';
+      toast('Lỗi kết nối signalling: '+e.type,'err');
+    });
+    H.peer.on('call',onIncomingCall);
+    H.peer.on('connection',onIncomingData);
+    H.peer.on('disconnected',()=>{try{H.peer.reconnect();}catch(e){}});
+  };
+  attempt();
+}
+
+function onIncomingCall(call){
+  call.answer();
+  call.on('stream',stream=>{
+    const old=H.chans.get(call.peer);
+    if(old&&old.call){try{old.call.close();}catch(e){}}
+    if(H.chans.has(call.peer))removeChannel(call.peer);
+    addChannel(call.peer,stream,call);
+  });
+  call.on('close',()=>{const c=H.chans.get(call.peer);if(c&&c.call===call)removeChannel(call.peer);});
+}
+function onIncomingData(conn){
+  H.conns.push(conn);
+  conn.on('open',updateStatus);
+  conn.on('data',d=>handleData(conn,d));
+  conn.on('close',()=>{
+    H.conns=H.conns.filter(c=>c!==conn);
+    const was=H.names[conn.peer];delete H.names[conn.peer];
+    updateStatus();if(was)toast(was+' đã rời phòng');
+  });
+  conn.on('error',()=>{});
+}
+function handleData(conn,d){
+  if(!d||!d.t)return;
+  const name=H.names[conn.peer];
+  switch(d.t){
+    case 'hello':{
+      H.names[conn.peer]=d.name||'Khách';
+      const ch=H.chans.get(conn.peer);
+      if(ch){ch.name=H.names[conn.peer];ch.el.querySelector('.ch-name').textContent=ch.name;}
+      updateStatus();toast(H.names[conn.peer]+' đã vào phòng');break;
+    }
+    case 'mic':
+      updateStatus();
+      if(name)toast(name+(d.on?' vừa BẬT micro':' vừa tắt micro'));
+      break;
+    case 'play': if(H.player&&H.player.playVideo)H.player.playVideo(); break;
+    case 'pause':if(H.player&&H.player.pauseVideo)H.player.pauseVideo(); break;
+    case 'next': playNext(); break;
+    case 'vol':
+      if(H.ui.musicCh)H.ui.musicCh.setV((+d.v||0)/100);
+      break;
+    case 'seek': if(H.player&&H.player.seekTo)H.player.seekTo(+d.v||0,true); break;
+    case 'song': hostAddSong(d.id,name||'Khách'); break;
+  }
+}
+
+function enterHost(){
+  show('scr-host');
+  $('#hRoom').textContent=H.room;
+  $('#hCodeBig').textContent=H.room;
+  ensureAudio();
+  buildPlayer();
+  const mc={id:'__music',isMusic:true,name:'NHẠC · YouTube',v:H.musicV,level:H.musicV,peak:0};
+  buildChannel(mc,mc.name,true);
+  H.ui.musicCh=mc;
+  insertGhost();
+  renderQueue();
+  updateStatus();
+  requestAnimationFrame(vuLoop);
+  toast('Phòng đã sẵn sàng — mời điện thoại quét mã QR ở góc trên phải');
+}
+
+function buildPlayer(){
+  ytPend=true;
+  if(!ytAPI||H.player)return;
+  ytPend=false;
+  H.player=new YT.Player('yt',{
+    width:'100%',height:'100%',
+    playerVars:{playsinline:1,rel:0,modestbranding:1},
+    events:{
+      onReady:()=>{H.player.setVolume(Math.round(H.musicV*100));if(H.cur.id)H.player.loadVideoById(H.cur.id);},
+      onStateChange:e=>{
+        if(e.data===0)playNext();
+        if(e.data===1){
+          try{const d=H.player.getVideoData();if(d&&d.title){H.cur.title=d.title;renderNow();}}catch(x){}
         }
+      }
+    }
+  });
+}
 
-        function initSystem() {
-            roomName = document.getElementById('room-input').value.trim();
-            myRole = document.getElementById('role-select').value;
+/* --- kênh mixer --- */
+const ghostHTML=()=>'<div class="ch ghost" id="hGhost"><div>Chưa có micro nào<small>mời điện thoại quét mã QR để vào phòng</small></div></div>';
+function insertGhost(){if(!$('#hGhost'))$('#hChans').insertAdjacentHTML('beforeend',ghostHTML());}
 
-            if (!roomName) {
-                alert('Vui lòng nhập tên phòng!');
-                return;
-            }
+function buildChannel(ch,name,isMusic){
+  const d=document.createElement('div');d.className='ch'+(isMusic?' music':'');
+  d.innerHTML=
+    '<canvas class="vu" width="30" height="330"></canvas>'+
+    '<div class="fade"><div class="ticks"></div><div class="slot"></div><div class="thumb"></div></div>'+
+    '<div class="ch-name" title="'+esc(name)+'">'+esc(name)+'</div>'+
+    '<div class="ch-sub"><span class="pct mono">100</span><button class="mute" title="Tắt tiếng kênh này">M</button></div>';
+  $('#hChans').appendChild(d);
+  ch.el=d;ch.vu=d.querySelector('.vu');ch.vuctx=ch.vu.getContext('2d');
+  makeFader(ch,isMusic);
+  d.querySelector('.mute').addEventListener('click',()=>{
+    ch.muted=!ch.muted;
+    d.querySelector('.mute').classList.toggle('on',ch.muted);
+    if(isMusic){if(H.player&&H.player.setVolume)H.player.setVolume(ch.muted?0:Math.round(ch.v*100));}
+    else applyGain(ch);
+  });
+  return d;
+}
+function applyGain(ch){if(H.actx&&ch.gain)ch.gain.gain.setTargetAtTime(ch.muted?0:ch.v*ch.v,H.actx.currentTime,.01);}
+function makeFader(ch,isMusic){
+  const fade=ch.el.querySelector('.fade'),thumb=ch.el.querySelector('.thumb'),pct=ch.el.querySelector('.pct');
+  const THUMB=22;
+  ch.setV=v=>{
+    v=Math.max(0,Math.min(1,v));ch.v=v;
+    thumb.style.top=((fade.clientHeight-THUMB)*(1-v))+'px';
+    pct.textContent=Math.round(v*100);
+    if(isMusic){
+      H.musicV=v;ch.level=v;
+      if(!ch.muted&&H.player&&H.player.setVolume)H.player.setVolume(Math.round(v*100));
+    }else applyGain(ch);
+  };
+  let drag=false;
+  const move=e=>{const r=fade.getBoundingClientRect();ch.setV(1-(e.clientY-r.top)/r.height);};
+  fade.addEventListener('pointerdown',e=>{drag=true;fade.setPointerCapture(e.pointerId);move(e);e.preventDefault();});
+  fade.addEventListener('pointermove',e=>{if(drag)move(e);});
+  const up=()=>drag=false;
+  fade.addEventListener('pointerup',up);fade.addEventListener('pointercancel',up);
+  fade.addEventListener('dblclick',()=>ch.setV(1));
+  ch.setV(isMusic?H.musicV:1);
+}
 
-            document.getElementById('setup-section').classList.add('hidden');
-            setStatus("Đang khởi tạo kết nối mạng...", "text-yellow-400");
+function addChannel(peerId,stream,call){
+  ensureAudio();
+  const name=H.names[peerId]||('Micro '+(H.chans.size+1));
+  const src=H.actx.createMediaStreamSource(stream);
+  const gain=H.actx.createGain();gain.gain.value=1;
+  const an=H.actx.createAnalyser();an.fftSize=512;
+  src.connect(gain);gain.connect(an);an.connect(H.actx.destination);gain.connect(H.recBus);
+  // "bơm" stream qua một audio element ẩn để trình duyệt luôn đẩy dữ liệu (workaround Chrome)
+  const pump=document.createElement('audio');pump.muted=true;pump.srcObject=stream;
+  pump.play().catch(()=>{});
+  const ch={id:peerId,call,name,src,gain,an,pump,v:1,muted:false,level:0,peak:0,
+            buf:new Uint8Array(an.fftSize)};
+  buildChannel(ch,name,false);
+  H.chans.set(peerId,ch);
+  const g=$('#hGhost');if(g)g.remove();
+  updateStatus();
+  toast(name+' đang hát qua một kênh mới trên bàn trộn');
+}
+function removeChannel(peerId){
+  const ch=H.chans.get(peerId);if(!ch)return;
+  try{ch.src.disconnect();ch.gain.disconnect();ch.an.disconnect();}catch(e){}
+  try{ch.pump.pause();ch.pump.srcObject=null;}catch(e){}
+  ch.el.remove();H.chans.delete(peerId);
+  updateStatus();
+  if(H.chans.size===0)insertGhost();
+}
+function updateStatus(){
+  const devs=[...new Set(H.conns.filter(c=>c.open).map(c=>c.peer))].length;
+  const m=H.chans.size;
+  $('#hStatus').textContent=
+    m?m+' micro đang mở · '+devs+' thiết bị trong phòng':
+    (devs?devs+' thiết bị trong phòng — chờ ai đó mở micro':'Chưa có ai vào phòng — quét QR hoặc nhập mã để mời');
+}
 
-            // Sử dụng PeerJS Cloud công khai miễn phí
-            peer = new Peer();
+/* --- đèn VU --- */
+function drawLED(ch){
+  const ctx=ch.vuctx,W=ch.vu.width,Ht=ch.vu.height;
+  ctx.clearRect(0,0,W,Ht);
+  const N=24,g=4,segH=(Ht-(N-1)*g)/N;
+  const litN=Math.round(ch.level*N),pk=Math.round((ch.peak||0)*N);
+  for(let i=0;i<N;i++){
+    const y=Ht-(i+1)*segH-i*g,hot=i>=N-4;
+    ctx.fillStyle=i<litN?(hot?'#ff4b2e':'#e9dec4'):'#2b241f';
+    ctx.fillRect(3,y,W-6,segH);
+  }
+  if(pk>0&&pk>litN){const y=Ht-pk*segH-(pk-1)*g;ctx.fillStyle='#ff4b2e';ctx.fillRect(3,y,W-6,2);}
+}
+function vuLoop(){
+  if($('#scr-host').classList.contains('on')){
+    const all=[...H.chans.values()];
+    if(H.ui.musicCh)all.push(H.ui.musicCh);
+    for(const ch of all){
+      if(!ch.isMusic&&ch.an){
+        ch.an.getByteTimeDomainData(ch.buf);
+        let s=0,n=0;
+        for(let i=0;i<ch.buf.length;i+=4){const x=(ch.buf[i]-128)/128;s+=x*x;n++;}
+        ch.level=Math.min(1,Math.sqrt(s/n)*3.4);
+      }
+      ch.peak=Math.max(ch.level,(ch.peak||0)-.006);
+      drawLED(ch);
+    }
+  }
+  requestAnimationFrame(vuLoop);
+}
 
-            peer.on('open', (id) => {
-                console.log('My peer ID is: ' + id);
-                if (myRole === 'laptop') {
-                    // Laptop đăng ký ID mang tên phòng + "_laptop" để điện thoại dễ tìm
-                    // Hoặc đơn giản hơn: lưu ID vào localStorage/hoặc dùng chung quy ước phòng
-                    registerAsLaptop();
-                } else {
-                    // Điện thoại tìm Laptop của phòng tương ứng để kết nối
-                    searchAndConnectToLaptop();
-                }
-            });
+/* --- hàng bài & phát nhạc --- */
+function hostAddSong(id,by){
+  if(!id){toast('Không nhận diện được link YouTube','err');return;}
+  if(!H.cur.id){playId(id,by);}
+  else{
+    const item={id,by,title:null};H.queue.push(item);renderQueue();
+    toast('Đã thêm vào hàng chờ');
+    fetchTitle(id).then(t=>{if(t){item.title=t;renderQueue();}});
+  }
+}
+function playId(id,by){
+  H.cur={id,by:by||'',title:''};
+  $('#hVidEmpty').hidden=true;
+  try{H.player.loadVideoById(id);H.player.playVideo();}catch(e){}
+  renderNow();
+  fetchTitle(id).then(t=>{if(t&&H.cur.id===id){H.cur.title=t;renderNow();}});
+}
+function playNext(){
+  const n=H.queue.shift();renderQueue();
+  if(n)playId(n.id,n.by);
+  else{
+    H.cur={id:null,by:'',title:''};renderNow();
+    $('#hVidEmpty').hidden=false;
+    try{H.player.stopVideo();}catch(e){}
+  }
+}
+function renderNow(){
+  $('#hNowTitle').textContent=H.cur.id?(H.cur.title||'Đang tải tên bài…'):'Chưa có bài — dán link karaoke YouTube bên dưới.';
+}
+function renderQueue(){
+  const ul=$('#hQueue');
+  $('#hQCount').textContent=H.queue.length?H.queue.length+' bài':'';
+  if(!H.queue.length){ul.innerHTML='<li class="q-empty">Hàng chờ trống — ai cũng có thể điểm bài từ điện thoại.</li>';return;}
+  ul.innerHTML=H.queue.map((q,i)=>
+    '<li><span class="q-ix">'+String(i+1).padStart(2,'0')+'</span>'+
+    '<span class="q-t">'+esc(q.title||q.id)+'</span>'+
+    '<span class="q-by">'+esc(q.by||'')+'</span>'+
+    '<button class="q-x" data-i="'+i+'" title="Xóa bài"><svg class="ic sm"><use href="#i-x"/></svg></button></li>').join('');
+}
 
-            peer.on('error', (err) => {
-                console.error(err);
-                setStatus("Lỗi kết nối: " + err.type, "text-red-400");
-            });
+/* --- đồng bộ trạng thái + phát lệnh xuống điện thoại --- */
+setInterval(()=>{
+  if(!$('#scr-host').classList.contains('on')||!H.player||!H.player.getPlayerState)return;
+  let playing=false,pos=0,dur=0,vol=H.musicV*100,title='';
+  try{
+    playing=H.player.getPlayerState()===1;
+    pos=H.player.getCurrentTime()||0;dur=H.player.getDuration()||0;vol=H.player.getVolume();
+    const d=H.player.getVideoData();title=(d&&d.title)||H.cur.title||'';
+  }catch(e){}
+  setPlayIcon($('#hPlay'),playing);
+  $('#hNowTime').textContent=H.cur.id?fmt(pos)+' / '+fmt(dur):'';
+  const msg={t:'state',playing,title,pos,dur,vol,qlen:H.queue.length};
+  H.conns.forEach(c=>{try{if(c.open)c.send(msg);}catch(e){}});
+},600);
+
+/* --- nút điều khiển máy chính --- */
+ $('#hPlay').addEventListener('click',()=>{
+  if(!H.player||!H.cur.id){
+    if(H.queue.length)playNext();
+    else toast('Chưa có bài nào — dán link YouTube để bắt đầu','err');
+    return;
+  }
+  try{H.player.getPlayerState()===1?H.player.pauseVideo():H.player.playVideo();}catch(e){}
+});
+ $('#hNext').addEventListener('click',()=>{
+  if(H.queue.length||H.cur.id)playNext();else toast('Hàng chờ trống');
+});
+ $('#hAdd').addEventListener('click',()=>{
+  const id=parseYT($('#hUrl').value);
+  if(!id){toast('Link YouTube không nhận diện được','err');return;}
+  $('#hUrl').value='';hostAddSong(id,'Máy chính');
+});
+ $('#hUrl').addEventListener('keydown',e=>{if(e.key==='Enter')$('#hAdd').click();});
+ $('#hQueue').addEventListener('click',e=>{
+  const b=e.target.closest('.q-x');if(!b)return;
+  H.queue.splice(+b.dataset.i,1);renderQueue();
+});
+ $('#hCopy').addEventListener('click',()=>copyText(inviteURL(H.room),'Đã sao chép liên kết mời'));
+ $('#hQr').addEventListener('click',()=>{
+  const url=inviteURL(H.room);
+  $('#qrCode').textContent=H.room;$('#qrUrl').textContent=url;
+  try{
+    const q=qrcode(0,'M');q.addData(url);q.make();
+    $('#qrPaper').innerHTML=q.createSvgTag({cellSize:4,margin:2,scalable:true});
+  }catch(e){$('#qrPaper').textContent=url;}
+  $('#qrModal').classList.add('on');
+});
+ $('#qrX').addEventListener('click',()=>$('#qrModal').classList.remove('on'));
+ $('#qrModal').addEventListener('click',e=>{if(e.target.id==='qrModal')e.target.classList.remove('on');});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){$('#qrModal').classList.remove('on');if(P.scan)closeScan();}
+});
+
+/* --- ghi âm tổng tiếng micro --- */
+ $('#hRec').addEventListener('click',()=>{
+  if(H.mr){try{H.mr.stop();}catch(e){}return;}
+  if(!window.MediaRecorder){toast('Trình duyệt không hỗ trợ ghi âm','err');return;}
+  ensureAudio();
+  const mt=['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t))||'';
+  try{H.mr=new MediaRecorder(H.recDest.stream,mt?{mimeType:mt}:undefined);}
+  catch(e){toast('Không bật được bộ ghi','err');return;}
+  H.recChunks=[];
+  H.mr.ondataavailable=e=>{if(e.data.size)H.recChunks.push(e.data);};
+  H.mr.onstop=()=>{
+    const blob=new Blob(H.recChunks,{type:H.mr.mimeType||'audio/webm'});
+    const ext=/mp4/.test(H.mr.mimeType||'')?'m4a':'webm';
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);a.download='laba-phong-'+H.room+'.'+ext;a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+    H.mr=null;clearInterval(H.recTimer);
+    $('#hRec').classList.remove('live');$('#hRecTxt').textContent='GHI tiếng micro';
+    toast('Đã lưu bản thu tiếng micro (nhạc YouTube không nằm trong bản thu)');
+  };
+  H.mr.start();
+  H.recT=0;$('#hRec').classList.add('live');$('#hRecTxt').textContent='Dừng · 0:00';
+  H.recTimer=setInterval(()=>{H.recT++;$('#hRecTxt').textContent='Dừng · '+fmt(H.recT);},1000);
+  toast('Bắt đầu ghi — chỉ ghi tổng tiếng các micro');
+});
+
+/* ================= ĐIỆN THOẠI ================= */
+const P={room:'',name:'',peer:null,conn:null,call:null,stream:null,actx:null,an:null,buf:null,
+  micOn:false,wl:null,st:null,scan:null,scanRAF:0,volDrag:false};
+
+// có mã phòng trên URL (quét QR) → điền sẵn
+(function(){
+  const r=new URLSearchParams(location.search).get('room');
+  if(r)$('#pRoom').value=r.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4);
+  const n=localStorage.getItem('laba.name');if(n)$('#pName').value=n;
+})();
+
+function pErr(m){$('#pErr').textContent=m||'';}
+function doJoin(){
+  const name=$('#pName').value.trim().slice(0,18);
+  const room=$('#pRoom').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4);
+  if(room.length<4){return pErr('Nhập đủ mã phòng 4 ký tự in trên màn hình máy chính.');}
+  if(!name){return pErr('Nhập biệt danh để cả phòng biết ai đang hát.');}
+  localStorage.setItem('laba.name',name);
+  P.room=room;P.name=name;
+  $('#pGo').disabled=true;$('#pGo').textContent='Đang vào phòng…';pErr('');
+  P.peer=new Peer({debug:0});
+  const fail=m=>{
+    $('#pGo').disabled=false;$('#pGo').textContent='VÀO PHÒNG';pErr(m);
+    try{P.peer&&P.peer.destroy();}catch(e){}P.peer=null;
+  };
+  const to=setTimeout(()=>fail('Không phản hồi từ phòng '+room+' — kiểm tra mã, và bảo đảm máy chính còn mở trang.'),12000);
+  P.peer.on('open',()=>{
+    P.conn=P.peer.connect('laba-'+room.toLowerCase(),{reliable:true});
+    P.conn.on('open',()=>{
+      clearTimeout(to);
+      try{P.conn.send({t:'hello',name:P.name});}catch(e){}
+      enterStage();
+    });
+    P.conn.on('data',d=>{if(d&&d.t==='state')renderState(d);});
+    P.conn.on('close',()=>{if(P.micOn)micOff();$('#pLost').hidden=false;});
+  });
+  P.peer.on('error',e=>{
+    clearTimeout(to);
+    if(e.type==='peer-unavailable')fail('Không tìm thấy phòng '+room+' — mã có thể sai hoặc máy chính đã đóng trang.');
+    else fail('Lỗi kết nối: '+e.type);
+  });
+}
+function enterStage(){
+  $('#pJoin').hidden=true;$('#pStage').hidden=false;
+  $('#pRoomTag').textContent=P.room;$('#pMe').textContent=P.name;
+  micUI(false);
+  toast('Đã vào phòng '+P.room+' — chạm nút micro để bắt đầu hát');
+}
+function send(o){try{if(P.conn&&P.conn.open){P.conn.send(o);return true;}}catch(e){}return false;}
+
+/* --- micro --- */
+function micUI(on){
+  const b=$('#pMic');b.classList.toggle('on',on);
+  $('#pRing').style.strokeDashoffset=578;
+  const s=$('#pMicState');s.className='mic-state'+(on?' on':'');s.textContent=on?'ĐANG HÁT':'Chạm để mở micro';
+}
+async function micOn(){
+  if(P.micOn)return;
+  const s=$('#pMicState');s.className='mic-state connecting';s.textContent='Đang nối micro…';
+  try{
+    P.stream=await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1},video:false
+    });
+  }catch(e){
+    micUI(false);
+    toast('Không truy cập được micro — hãy cho phép quyền micro trong trình duyệt','err');
+    return;
+  }
+  try{
+    P.actx=new (window.AudioContext||window.webkitAudioContext)();
+    if(P.actx.state==='suspended')await P.actx.resume();
+    const src=P.actx.createMediaStreamSource(P.stream);
+    P.an=P.actx.createAnalyser();P.an.fftSize=512;
+    src.connect(P.an);P.buf=new Uint8Array(P.an.fftSize);
+  }catch(e){P.an=null;}
+  P.call=P.peer.call('laba-'+P.room.toLowerCase(),P.stream);
+  P.call.on('close',()=>{
+    if(P.micOn){P.micOn=false;micUI(false);toast('Kết nối micro bị ngắt','err');}
+  });
+  P.micOn=true;
+  $('#pMicState').className='mic-state on';$('#pMicState').textContent='ĐANG HÁT';
+  send({t:'mic',on:true});
+  try{P.wl=await navigator.wakeLock.request('screen');}catch(e){}
+  requestAnimationFrame(ringLoop);
+}
+function micOff(){
+  if(P.micOn)send({t:'mic',on:false});
+  P.micOn=false;
+  try{P.call&&P.call.close();}catch(e){}
+  try{P.stream&&P.stream.getTracks().forEach(t=>t.stop());}catch(e){}
+  try{P.actx&&P.actx.close();}catch(e){}
+  try{P.wl&&P.wl.release();}catch(e){}
+  P.call=null;P.stream=null;P.an=null;P.actx=null;P.wl=null;
+  micUI(false);
+}
+function ringLoop(){
+  if(P.micOn&&P.an){
+    P.an.getByteTimeDomainData(P.buf);
+    let s=0,n=0;
+    for(let i=0;i<P.buf.length;i+=4){const x=(P.buf[i]-128)/128;s+=x*x;n++;}
+    const lv=Math.min(1,Math.sqrt(s/n)*3.4);
+    $('#pRing').style.strokeDashoffset=578*(1-lv*.85);
+    requestAnimationFrame(ringLoop);
+  }else $('#pRing').style.strokeDashoffset=578;
+}
+
+/* --- nhận trạng thái từ máy chính --- */
+function renderState(d){
+  P.st=d;
+  $('#pTitle').textContent=d.title||'Chưa có bài nào — hãy điểm bài!';
+  $('#pPos').textContent=fmt(d.pos);$('#pDur').textContent=fmt(d.dur);
+  $('#pFill').style.width=(d.dur?Math.min(100,d.pos/d.dur*100):0)+'%';
+  $('#pQ').textContent=d.qlen?('Hàng chờ: '+d.qlen+' bài'):'';
+  setPlayIcon($('#pPlay'),!!d.playing);
+  if(!P.volDrag)$('#pVol').value=Math.round(d.vol??80);
+}
+
+/* --- điều khiển từ xa --- */
+ $('#pPlay').addEventListener('click',()=>send({t:(P.st&&P.st.playing)?'pause':'play'}));
+ $('#pNext').addEventListener('click',()=>send({t:'next'}));
+ $('#pVol').addEventListener('pointerdown',()=>P.volDrag=true);
+ $('#pVol').addEventListener('pointerup',()=>P.volDrag=false);
+ $('#pVol').addEventListener('input',e=>send({t:'vol',v:+e.target.value}));
+ $('#pReq').addEventListener('click',()=>{
+  const id=parseYT($('#pUrl').value);
+  if(!id){toast('Link YouTube không nhận diện được','err');return;}
+  $('#pUrl').value='';
+  if(send({t:'song',id})){
+    const el=$('#pSent');el.textContent='Đã gửi lên máy chính — chờ chủ phòng bấm PLAY nhé';
+    clearTimeout(P._ft);P._ft=setTimeout(()=>el.textContent='',2800);
+  }else toast('Chưa kết nối được tới máy chính','err');
+});
+ $('#pUrl').addEventListener('keydown',e=>{if(e.key==='Enter')$('#pReq').click();});
+// thanh thời gian: kéo xem trước, thả tay mới gửi lệnh seek
+(function(){
+  const bar=$('#pProg');let drag=false;
+  const preview=e=>{
+    if(!P.st||!P.st.dur)return;
+    const r=bar.getBoundingClientRect();
+    const p=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+    $('#pFill').style.width=p*100+'%';
+    $('#pPos').textContent=fmt(p*P.st.dur);
+  };
+  bar.addEventListener('pointerdown',e=>{drag=true;bar.setPointerCapture(e.pointerId);preview(e);});
+  bar.addEventListener('pointermove',e=>{if(drag)preview(e);});
+  bar.addEventListener('pointerup',e=>{
+    drag=false;
+    if(P.st&&P.st.dur){
+      const r=bar.getBoundingClientRect();
+      send({t:'seek',v:Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*P.st.dur});
+    }
+  });
+})();
+
+ $('#pLeave').addEventListener('click',()=>{
+  micOff();
+  try{P.conn&&P.conn.close();}catch(e){}
+  try{P.peer&&P.peer.destroy();}catch(e){}
+  P.peer=null;P.conn=null;
+  $('#pStage').hidden=true;$('#pJoin').hidden=false;
+  $('#pGo').disabled=false;$('#pGo').textContent='VÀO PHÒNG';
+});
+ $('#pRetry').addEventListener('click',()=>{
+  $('#pLost').hidden=true;
+  try{P.peer&&P.peer.destroy();}catch(e){}
+  P.peer=null;P.conn=null;
+  doJoin();
+});
+// quên tắt màn hình làm rớt micro? kiểm tra khi mở lại
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&P.micOn){
+    const dead=!P.stream||P.stream.getAudioTracks().every(t=>t.readyState!=='live');
+    if(dead){P.micOn=false;micUI(false);toast('Micro bị ngắt khi màn hình tắt — chạm lại để mở','err');}
+    else if(navigator.wakeLock){navigator.wakeLock.request('screen').then(w=>P.wl=w).catch(()=>{});}
+  }
+});
+
+/* --- quét QR --- */
+async function openScan(){
+  if(typeof jsQR!=='function')return toast('Không tải được bộ quét QR — hãy nhập mã bằng tay','err');
+  $('#scanModal').classList.add('on');
+  try{P.scan=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});}
+  catch(e){closeScan();return toast('Không mở được camera','err');}
+  const v=$('#scanVid');v.srcObject=P.scan;
+  try{await v.play();}catch(e){}
+  const c=document.createElement('canvas');
+  const g=c.getContext('2d',{willReadFrequently:true});
+  const tick=()=>{
+    if(!P.scan)return;
+    if(v.readyState>=2&&v.videoWidth){
+      c.width=v.videoWidth;c.height=v.videoHeight;
+      g.drawImage(v,0,0);
+      const img=g.getImageData(0,0,c.width,c.height);
+      const r=jsQR(img.data,c.width,c.height,{inversionAttempts:'dontInvert'});
+      if(r&&r.data){
+        const m=r.data.match(/[?&]room=([A-Za-z0-9]{4})/);
+        if(m){
+          closeScan();
+          $('#pRoom').value=m[1].toUpperCase();
+          if($('#pName').value.trim())doJoin();else $('#pName').focus();
+          return;
         }
+      }
+    }
+    P.scanRAF=requestAnimationFrame(tick);
+  };
+  tick();
+}
+function closeScan(){
+  if(P.scan)P.scan.getTracks().forEach(t=>t.stop());
+  P.scan=null;cancelAnimationFrame(P.scanRAF);
+  $('#scanModal').classList.remove('on');$('#scanVid').srcObject=null;
+}
+ $('#pScanBtn').addEventListener('click',openScan);
+ $('#scanX').addEventListener('click',closeScan);
+ $('#scanModal').addEventListener('click',e=>{if(e.target.id==='scanModal')closeScan();});
 
-        // --- XỬ LÝ CHO LAPTOP ---
-        function registerAsLaptop() {
-            // Đổi ID của Peer thành tên phòng cố định để điện thoại dễ gọi tới
-            // Lưu ý: PeerJS không cho phép đặt trùng ID, nên ta dùng tên phòng + "_laptop_host"
-            peer.destroy();
-            peer = new Peer(roomName + "_laptop_host");
-
-            peer.on('open', () => {
-                setStatus("Laptop đã sẵn sàng! Đang đợi điện thoại vào phòng...", "text-green-400");
-                document.getElementById('laptop-panel').classList.remove('hidden');
-            });
-
-            peer.on('error', (err) => {
-                if (err.type === 'unavailable-id') {
-                    alert('Tên phòng này đã có Laptop khác làm chủ phòng! Vui lòng chọn tên phòng khác.');
-                    location.reload();
-                }
-            });
-
-            // Khi điện thoại gọi tới để truyền âm thanh
-            peer.on('call', (call) => {
-                call.answer(); // Trả lời cuộc gọi không cần gửi lại luồng vì laptop chỉ nhận
-                call.on('stream', (remoteStream) => {
-                    console.log('Đã nhận luồng âm thanh từ điện thoại:', call.peer);
-                    addAudioStreamToUI(call.peer, remoteStream);
-                });
-                
-                call.on('close', () => {
-                    removeAudioStreamFromUI(call.peer);
-                });
-            });
-        }
-
-        function addAudioStreamToUI(peerId, stream) {
-            document.getElementById('no-phone-text')?.remove();
-            const container = document.getElementById('audio-streams-container');
-            
-            let audioCard = document.getElementById(`card-${peerId}`);
-            if (!audioCard) {
-                audioCard = document.createElement('div');
-                audioCard.id = `card-${peerId}`;
-                audioCard.className = "bg-slate-900 border border-slate-700 p-3 rounded-lg flex flex-col gap-2";
-                
-                audioCard.innerHTML = `
-                    <div class="flex justify-between items-center text-xs text-slate-400">
-                        <span>📱 Thiết bị: ${peerId.slice(0, 6)}...</span>
-                        <span class="text-green-400 font-medium">● Đang kết nối</span>
-                    </div>
-                    <audio id="audio-${peerId}" autoplay controls class="w-full h-8"></audio>
-                `;
-                container.appendChild(audioCard);
-            }
-            
-            const audioElement = document.getElementById(`audio-${peerId}`);
-            audioElement.srcObject = stream;
-        }
-
-        function removeAudioStreamFromUI(peerId) {
-            document.getElementById(`card-${peerId}`)?.remove();
-            if(document.getElementById('audio-streams-container').children.length === 0) {
-                document.getElementById('audio-streams-container').innerHTML = `<p class="text-slate-500 text-sm italic col-span-2" id="no-phone-text">Đang chờ điện thoại kết nối vào phòng...</p>`;
-            }
-        }
-
-        // --- XỬ LÝ CHO ĐIỆN THOẠI ---
-        function searchAndConnectToLaptop() {
-            setStatus("Đang tìm Laptop trong phòng...", "text-yellow-400");
-            document.getElementById('phone-panel').classList.remove('hidden');
-        }
-
-        async function toggleMic() {
-            const btn = document.getElementById('mic-toggle-btn');
-            const status = document.getElementById('mic-status');
-
-            if (!localStream) {
-                try {
-                    // Xin quyền truy cập micro điện thoại
-                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                    
-                    status.innerText = "Trạng thái: Đang kết nối và truyền tiếng...";
-                    status.className = "text-lg font-medium text-green-400 mb-6";
-                    btn.innerText = "🛑 Tắt Micro";
-                    btn.classList.replace('bg-emerald-600', 'bg-red-600');
-                    btn.classList.replace('hover:bg-emerald-700', 'hover:bg-red-700');
-
-                    // Gọi thẳng tới Laptop của phòng đó
-                    const laptopId = roomName + "_laptop_host";
-                    const call = peer.call(laptopId, localStream);
-                    
-                    if (!call) {
-                        alert('Không tìm thấy Laptop trong phòng này! Hãy chắc chắn Laptop đã vào phòng trước.');
-                        toggleMic();
-                        return;
-                    }
-
-                    setStatus("Đã kết nối thành công với Laptop!", "text-green-400");
-
-                    call.on('close', () => {
-                        setStatus("Mất kết nối với Laptop!", "text-red-400");
-                    });
-
-                } catch (err) {
-                    alert('Không thể mở được Micro. Hãy cấp quyền Microphone cho trình duyệt!');
-                    console.error(err);
-                }
-            } else {
-                localStream.getTracks().forEach(track => track.stop());
-                localStream = null;
-                status.innerText = "Trạng thái: Đã tắt Micro";
-                status.className = "text-lg font-medium text-yellow-400 mb-6";
-                btn.innerText = "🎙️ Bật Micro Hát";
-                btn.classList.replace('bg-red-600', 'bg-emerald-600');
-                btn.classList.replace('hover:bg-red-700', 'hover:bg-emerald-700');
-                setStatus("Đã tắt mic", "text-yellow-400");
-            }
-        }
-
-        // --- TẢI YOUTUBE TRÊN LAPTOP ---
-        function loadYouTube() {
-            let input = document.getElementById('yt-link').value.trim();
-            let videoId = input;
-            
-            if (input.includes('youtube.com') || input.includes('youtu.be')) {
-                const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-                const match = input.match(regExp);
-                if (match && match[2].length === 11) {
-                    videoId = match[2];
-                }
-            }
-
-            if (videoId.length !== 11) {
-                alert('Đường dẫn YouTube không hợp lệ!');
-                return;
-            }
-
-            const container = document.getElementById('youtube-player-container');
-            container.innerHTML = `<iframe class="w-full h-full" src="https://www.youtube.com/embed/${videoId}?autoplay=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
-        }
-    </script>
+/* ================= KHỞI ĐỘNG ================= */
+ $('#btnHost').addEventListener('click',e=>createRoom(e.currentTarget));
+ $('#btnMic').addEventListener('click',()=>show('scr-phone'));
+ $('#pGo').addEventListener('click',doJoin);
+ $('#pName').addEventListener('keydown',e=>{if(e.key==='Enter')$('#pRoom').focus();});
+ $('#pRoom').addEventListener('keydown',e=>{if(e.key==='Enter')doJoin();});
+ $('#pRoom').addEventListener('input',e=>{
+  e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4);
+});
+</script>
 </body>
 </html>
