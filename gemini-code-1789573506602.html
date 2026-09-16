@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Karaoke P2P Đa Thiết Bị</title>
+    <!-- Tailwind CSS để giao diện đẹp mắt -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PeerJS CDN để kết nối P2P trực tiếp qua trình duyệt -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body class="bg-slate-950 text-white min-h-screen p-4 flex flex-col items-center">
+
+    <div class="max-w-4xl w-full bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl">
+        <h1 class="text-2xl font-black text-center mb-2 text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-violet-500">
+            🎤 Phòng Karaoke Đa Thiết Bị (P2P)
+        </h1>
+        <p class="text-center text-slate-400 text-sm mb-6">Thu âm từ điện thoại không dây trực tiếp về Laptop qua WebRTC</p>
+        
+        <!-- Cấu hình kết nối ban đầu -->
+        <div id="setup-section" class="flex flex-col sm:flex-row gap-3 mb-6 justify-center items-center bg-slate-800/50 p-4 rounded-xl">
+            <input type="text" id="room-input" placeholder="Nhập tên phòng (vd: phongkaraoke123)" class="px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 focus:outline-none focus:border-pink-500 w-72 text-sm">
+            <select id="role-select" class="px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 focus:outline-none text-sm">
+                <option value="laptop">💻 Laptop (Nhận tiếng + Mở YouTube)</option>
+                <option value="phone">📱 Điện thoại (Thu âm gửi đi)</option>
+            </select>
+            <button onclick="initSystem()" class="bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90 px-6 py-2.5 rounded-lg font-semibold transition text-sm shadow-lg">Vào Phòng</button>
+        </div>
+
+        <!-- Trạng thái kết nối -->
+        <div id="status-box" class="hidden text-center mb-6 text-sm py-2 px-4 rounded-lg bg-slate-800 text-slate-300">
+            Trạng thái: <span id="status-text" class="font-semibold text-yellow-400">Đang kết nối...</span>
+        </div>
+
+        <!-- Giao diện Laptop -->
+        <div id="laptop-panel" class="hidden space-y-6">
+            <!-- Khung YouTube -->
+            <div class="bg-slate-800/60 border border-slate-700/50 p-4 rounded-xl">
+                <h2 class="text-base font-semibold mb-3 flex items-center gap-2 text-pink-400">📺 Chọn Bài Hát Karaoke YouTube</h2>
+                <div class="flex gap-2 mb-3">
+                    <input type="text" id="yt-link" placeholder="Dán link YouTube (vd: https://www.youtube.com/watch?v=...)" class="flex-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-pink-500">
+                    <button onclick="loadYouTube()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-semibold transition">Phát Nhạc</button>
+                </div>
+                <div id="youtube-player-container" class="aspect-video w-full bg-black rounded-lg overflow-hidden flex items-center justify-center text-slate-500 border border-slate-800">
+                    Chưa có bài hát nào được chọn
+                </div>
+            </div>
+
+            <!-- Khung thu âm các điện thoại gửi về -->
+            <div class="bg-slate-800/60 border border-slate-700/50 p-4 rounded-xl">
+                <h2 class="text-base font-semibold mb-3 flex items-center gap-2 text-green-400">🎚️ Âm thanh thu từ các Điện thoại</h2>
+                <div id="audio-streams-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <p class="text-slate-500 text-sm italic col-span-2" id="no-phone-text">Đang chờ điện thoại kết nối vào phòng...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Giao diện Điện thoại -->
+        <div id="phone-panel" class="hidden text-center space-y-6 py-12">
+            <div class="p-6 bg-slate-800/60 border border-slate-700/50 rounded-2xl max-w-sm mx-auto shadow-inner">
+                <div id="mic-status" class="text-lg font-medium text-yellow-400 mb-6">Trạng thái: Sẵn sàng kết nối</div>
+                <button id="mic-toggle-btn" onclick="toggleMic()" class="bg-emerald-600 hover:bg-emerald-700 text-white w-full py-4 rounded-xl text-lg font-bold shadow-lg transition flex items-center justify-center gap-2">
+                    🎙️ Bật Micro Hát
+                </button>
+                <p class="text-xs text-slate-400 mt-4 leading-relaxed">Hãy đeo tai nghe trên điện thoại khi hát để tránh tiếng hú vọng vào loa của Laptop.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let peer;
+        let myRole = '';
+        let roomName = '';
+        let localStream = null;
+        let connectedCalls = {};
+
+        function setStatus(text, colorClass = "text-yellow-400") {
+            const box = document.getElementById('status-box');
+            const txt = document.getElementById('status-text');
+            box.classList.remove('hidden');
+            txt.className = `font-semibold ${colorClass}`;
+            txt.innerText = text;
+        }
+
+        function initSystem() {
+            roomName = document.getElementById('room-input').value.trim();
+            myRole = document.getElementById('role-select').value;
+
+            if (!roomName) {
+                alert('Vui lòng nhập tên phòng!');
+                return;
+            }
+
+            document.getElementById('setup-section').classList.add('hidden');
+            setStatus("Đang khởi tạo kết nối mạng...", "text-yellow-400");
+
+            // Sử dụng PeerJS Cloud công khai miễn phí
+            peer = new Peer();
+
+            peer.on('open', (id) => {
+                console.log('My peer ID is: ' + id);
+                if (myRole === 'laptop') {
+                    // Laptop đăng ký ID mang tên phòng + "_laptop" để điện thoại dễ tìm
+                    // Hoặc đơn giản hơn: lưu ID vào localStorage/hoặc dùng chung quy ước phòng
+                    registerAsLaptop();
+                } else {
+                    // Điện thoại tìm Laptop của phòng tương ứng để kết nối
+                    searchAndConnectToLaptop();
+                }
+            });
+
+            peer.on('error', (err) => {
+                console.error(err);
+                setStatus("Lỗi kết nối: " + err.type, "text-red-400");
+            });
+        }
+
+        // --- XỬ LÝ CHO LAPTOP ---
+        function registerAsLaptop() {
+            // Đổi ID của Peer thành tên phòng cố định để điện thoại dễ gọi tới
+            // Lưu ý: PeerJS không cho phép đặt trùng ID, nên ta dùng tên phòng + "_laptop_host"
+            peer.destroy();
+            peer = new Peer(roomName + "_laptop_host");
+
+            peer.on('open', () => {
+                setStatus("Laptop đã sẵn sàng! Đang đợi điện thoại vào phòng...", "text-green-400");
+                document.getElementById('laptop-panel').classList.remove('hidden');
+            });
+
+            peer.on('error', (err) => {
+                if (err.type === 'unavailable-id') {
+                    alert('Tên phòng này đã có Laptop khác làm chủ phòng! Vui lòng chọn tên phòng khác.');
+                    location.reload();
+                }
+            });
+
+            // Khi điện thoại gọi tới để truyền âm thanh
+            peer.on('call', (call) => {
+                call.answer(); // Trả lời cuộc gọi không cần gửi lại luồng vì laptop chỉ nhận
+                call.on('stream', (remoteStream) => {
+                    console.log('Đã nhận luồng âm thanh từ điện thoại:', call.peer);
+                    addAudioStreamToUI(call.peer, remoteStream);
+                });
+                
+                call.on('close', () => {
+                    removeAudioStreamFromUI(call.peer);
+                });
+            });
+        }
+
+        function addAudioStreamToUI(peerId, stream) {
+            document.getElementById('no-phone-text')?.remove();
+            const container = document.getElementById('audio-streams-container');
+            
+            let audioCard = document.getElementById(`card-${peerId}`);
+            if (!audioCard) {
+                audioCard = document.createElement('div');
+                audioCard.id = `card-${peerId}`;
+                audioCard.className = "bg-slate-900 border border-slate-700 p-3 rounded-lg flex flex-col gap-2";
+                
+                audioCard.innerHTML = `
+                    <div class="flex justify-between items-center text-xs text-slate-400">
+                        <span>📱 Thiết bị: ${peerId.slice(0, 6)}...</span>
+                        <span class="text-green-400 font-medium">● Đang kết nối</span>
+                    </div>
+                    <audio id="audio-${peerId}" autoplay controls class="w-full h-8"></audio>
+                `;
+                container.appendChild(audioCard);
+            }
+            
+            const audioElement = document.getElementById(`audio-${peerId}`);
+            audioElement.srcObject = stream;
+        }
+
+        function removeAudioStreamFromUI(peerId) {
+            document.getElementById(`card-${peerId}`)?.remove();
+            if(document.getElementById('audio-streams-container').children.length === 0) {
+                document.getElementById('audio-streams-container').innerHTML = `<p class="text-slate-500 text-sm italic col-span-2" id="no-phone-text">Đang chờ điện thoại kết nối vào phòng...</p>`;
+            }
+        }
+
+        // --- XỬ LÝ CHO ĐIỆN THOẠI ---
+        function searchAndConnectToLaptop() {
+            setStatus("Đang tìm Laptop trong phòng...", "text-yellow-400");
+            document.getElementById('phone-panel').classList.remove('hidden');
+        }
+
+        async function toggleMic() {
+            const btn = document.getElementById('mic-toggle-btn');
+            const status = document.getElementById('mic-status');
+
+            if (!localStream) {
+                try {
+                    // Xin quyền truy cập micro điện thoại
+                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    
+                    status.innerText = "Trạng thái: Đang kết nối và truyền tiếng...";
+                    status.className = "text-lg font-medium text-green-400 mb-6";
+                    btn.innerText = "🛑 Tắt Micro";
+                    btn.classList.replace('bg-emerald-600', 'bg-red-600');
+                    btn.classList.replace('hover:bg-emerald-700', 'hover:bg-red-700');
+
+                    // Gọi thẳng tới Laptop của phòng đó
+                    const laptopId = roomName + "_laptop_host";
+                    const call = peer.call(laptopId, localStream);
+                    
+                    if (!call) {
+                        alert('Không tìm thấy Laptop trong phòng này! Hãy chắc chắn Laptop đã vào phòng trước.');
+                        toggleMic();
+                        return;
+                    }
+
+                    setStatus("Đã kết nối thành công với Laptop!", "text-green-400");
+
+                    call.on('close', () => {
+                        setStatus("Mất kết nối với Laptop!", "text-red-400");
+                    });
+
+                } catch (err) {
+                    alert('Không thể mở được Micro. Hãy cấp quyền Microphone cho trình duyệt!');
+                    console.error(err);
+                }
+            } else {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+                status.innerText = "Trạng thái: Đã tắt Micro";
+                status.className = "text-lg font-medium text-yellow-400 mb-6";
+                btn.innerText = "🎙️ Bật Micro Hát";
+                btn.classList.replace('bg-red-600', 'bg-emerald-600');
+                btn.classList.replace('hover:bg-red-700', 'hover:bg-emerald-700');
+                setStatus("Đã tắt mic", "text-yellow-400");
+            }
+        }
+
+        // --- TẢI YOUTUBE TRÊN LAPTOP ---
+        function loadYouTube() {
+            let input = document.getElementById('yt-link').value.trim();
+            let videoId = input;
+            
+            if (input.includes('youtube.com') || input.includes('youtu.be')) {
+                const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+                const match = input.match(regExp);
+                if (match && match[2].length === 11) {
+                    videoId = match[2];
+                }
+            }
+
+            if (videoId.length !== 11) {
+                alert('Đường dẫn YouTube không hợp lệ!');
+                return;
+            }
+
+            const container = document.getElementById('youtube-player-container');
+            container.innerHTML = `<iframe class="w-full h-full" src="https://www.youtube.com/embed/${videoId}?autoplay=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+        }
+    </script>
+</body>
+</html>
